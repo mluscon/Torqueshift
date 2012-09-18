@@ -1,0 +1,58 @@
+#!/bin/bash
+# This is a simple build script and will be executed on your CI system if 
+# available.  Otherwise it will execute while your application is stopped
+# before the deploy step.  This script gets executed directly, so it
+# could be python, php, ruby, etc.
+
+JRUBY_VERSION="1.6.7"
+TORQUEBOX_VERSION="2.1.1"
+PADRINO_VERSION="0.10.7"
+
+
+cd ${OPENSHIFT_DATA_DIR}
+
+# Download a TorqueBox distribution and extract the modules
+if [ ! -d ${OPENSHIFT_DATA_DIR}/torquebox-${TORQUEBOX_VERSION} ]; then
+echo "Troquebox installation..."
+curl -Lo torquebox.zip "http://torquebox.org/release/org/torquebox/torquebox-dist/${TORQUEBOX_VERSION}/torquebox-dist-${TORQUEBOX_VERSION}-bin.zip"
+    unzip torquebox.zip
+    rm torquebox.zip
+fi
+
+# Add jruby to our path
+export TORQUEBOX_HOME=${OPENSHIFT_DATA_DIR}/torquebox-${TORQUEBOX_VERSION}
+export JBOSS_HOME=${TORQUEBOX_HOME}/jbos
+export JRUBY_HOME=${TORQUEBOX_HOME}/jruby
+export PATH=${JBOSS_HOME}/bin:${JRUBY_HOME}/bin:$PATH
+
+#Bind with openshift internal ip
+sed -i s/inet-address/loopback-address/g $TORQUEBOX_HOME/jboss/standalone/configuration/standalone.xml
+sed -i s/jboss.bind.address.management:127.0.0.1/env.OPENSHIFT_INTERNAL_IP/g $TORQUEBOX_HOME/jboss/standalone/configuration/standalone.xml
+sed -i s/jboss.bind.address.unsecure:127.0.0.1/env.OPENSHIFT_INTERNAL_IP/g $TORQUEBOX_HOME/jboss/standalone/configuration/standalone.xml
+sed -i s/jboss.bind.address:127.0.0.1/env.OPENSHIFT_INTERNAL_IP/g $TORQUEBOX_HOME/jboss/standalone/configuration/standalone.xml
+
+# Install Bundler if needed
+if ! jruby -S gem list | grep "bundler" > /dev/null; then
+echo "Bundler installation..."
+jruby -S gem install bundler
+fi
+
+# Install jruby-openssl if needed
+if ! jruby -S gem list | grep "jruby-openssl" > /dev/null; then
+echo "Jruby-openssl installation..."
+jruby -S gem install jruby-openssl
+fi
+
+# Install jdbcpostgresql
+if ! jruby -S gem list | grep "activerecord-jdbcpostgresql-adapter" > /dev/null; then
+echo "Jdbcpostgresql installation..."
+jruby -S gem install activerecord-jdbcpostgresql-adapter
+fi
+
+# Install Padrino
+if ! jruby -S gem list | grep "padrino" > /dev/null; then
+echo "Padrino installation..."
+jruby -S gem install padrino
+fi
+
+
